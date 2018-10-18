@@ -25,8 +25,8 @@ In this project, I will write LARS algorithm for simulated data and verify the o
 
 
 # References {-}
-1. Least-angle Regression. https://en.wikipedia.org/wiki/Least-angle_regression
-2. Hastie, T., Tibshirani, R.,, Friedman, J. (2008). The Elements of Statistical Learning. New York, NY, USA: Springer New York Inc.
+1.  Efron, B., Hastie, T., Johnstone, I., Tibshirani, R. (2004). Least Angle Regression. Annals of Statistics, 32(2).
+2. Hastie, T., Tibshirani, R., Friedman, J. (2008). The Elements of Statistical Learning. New York, NY, USA: Springer New York Inc.
 3. Shiny from R Studio. http://shiny.rstudio.com/
 
 
