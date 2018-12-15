@@ -1,33 +1,228 @@
 ---
-title: "Least Angle Regression and Shiny"
+title: "Least Angle Regression and Its Variants"
 subtitle: "Course Project of STAT 5361 Statistical Computing"
 author: Biju Wang^[<bijuwang@uconn.edu>]
 date: "`r format(Sys.Date(), '%m/%d/%Y')`"
+bibliography: mybib.bib
+biblio-style: chicago
 fontsize: 11pt
 header-includes: 
   \usepackage{float}
   \floatplacement{figure}{H}
-output: 
-  pdf_document:
-    number_sections: true
-    
-abstract: This project report will interactively visualize the leaset angle regression algorithm for fitting linear regression models to simulated data.
-keywords: Least Angle Regression, Shiny
+  \usepackage{algorithm}
+  \usepackage{algpseudocode}
+output:
+  bookdown::pdf_document2:
+    toc: FALSE
+abstract: This project will show the details of least angle regression algorithm. Based on its idea, the variants of this algorithm is also presented.
+keywords: Least Angle Regression
 ---
 
-Least Angle Regression (LARS) is an algorithm for fitting linear regression models to high dimensional data. Suppose we expect a response variable to be determined by a linear combination of a subset of potential covariates. Then the LARS algorithm provides a means of producing an estimate of which variables to include, as well as their coefficients.
+# Indroduction {#intro}
+\label{int}
+Least Angle Regression (LARS) is an algorithm for fitting linear regression models to high dimensional data [@LARSarticle]. Suppose we expect a response variable to be determined by a linear combination of a subset of potential covariates. Then the LARS algorithm provides a means of producing an estimate of which variables to include, as well as their coefficients.
 
-This algorithm is similar to forward stepwise regression. While forward stepwise regression builds a model sequentially, adding one variable at a time. At each step, it identifies the best variable to include in the active set and then updates the least square fit to include all the active variables. Least angle regression only enters "as much" of a predictor as it deserves. At the first step, it identifies the variable most correlated with the response. Rather than fit this variable completely, LAR moves the coefficient of this variable continuously toward its least squares value. As soon as another variable "catches up" in terms of correlation with the residual, the process is paused. The second variable then joins the active set, and their coefficients are moved together in a way that keeps their correlations tied and decreasing. This process is continued until all the variables are in the model and ends at the full least-squares fit. The whole procedure will terminate after $\min\{N-1, p\}$ steps where $N$ is the number of observations and $p$ is the size of covariates.
+This algorithm is similar to forward stepwise regression [@LARSbook]. While forward stepwise regression builds a model sequentially, adding one variable at a time. At each step, it identifies the best variable to include in the active set and then updates the least square fit to include all the active variables. Least angle regression only enters "as much" of a predictor as it deserves. At the first step, it identifies the variable most correlated with the response. Rather than fit this variable completely, LARS moves the coefficient of this variable continuously toward its least squares value. As soon as another variable "catches up" in terms of correlation with the residual, the process is paused. The second variable then joins the active set, and their coefficients are moved together in a \textcolor{red}{way that keeps their correlations tied and decreasing}. This process is continued until all the variables are in the model and ends at the full least-squares fit. The whole procedure will terminate after $\min\{N-1, p\}$ steps where $N$ is the number of observations and $p$ is the size of covariates.
 
-Shiny provides an incredible way to build interactive web applications. Shiny has automatic "reactive" binding between inputs and outputs and extensive pre-built widgets. It can also be embedded in R Markdown.
+In this project, I will write LARS algorithm for simulated data and compare the outcomes from my codes with the ones from package **lars**. I will also present two variants of LARS.
 
-In this project, I will write LARS algorithm for simulated data and compare the outcomes from my codes with the ones from the lars package. Shiny apps will be used to provide an interactive interface for the users to see how each step the coefficients change by sliding a button or inputting step number. More complex interfaces may also be added as I further learn how to build Shiny apps.
 
+
+
+# Least Angle Regression {#LARS}
+The details of least angle regression is in algorithm \ref{algo} [@LARSbook].
+
+\begin{algorithm}[H]
+\begin{algorithmic}[1]
+\State Centralize the predictors to have mean zero. Start with the residual $\mathbf{r}=\mathbf{y}-\bar{\mathbf{y}}, \beta_{1}=\cdots=\beta_{p}=0$
+\State Find the predictors $\mathbf{x}_{j}$ most correlated with $\mathbf{r}$
+\State Move $\beta_{j}$ from $0$ \textcolor{red}{towards its least-squares coefficient}, until some other competitor $\mathbf{x}_{k}$ has as much correlation with the current residual as does $\mathbf{x}_{j}$
+\State Move $\beta_{j}$ and $\beta_{k}$ in the \textcolor{red}{direction defined by their joint least squares coefficient} of the current residual on $(\mathbf{x}_{j}, \mathbf{x}_{k})$, until some other competitor $\mathbf{x}_{l}$ has as much correlation with the current residual
+\State Continue in this way until all $p$ predictors have been entered. After $\min(N-1, p)$ steps, we arrive at the full least-squares solution
+\end{algorithmic}
+\caption{Least Angle Regression\label{algo}}
+\end{algorithm}
+
+You may notice that in introduction, the idea of LARS is to make the correlation coefficients the same between residual and the predictor vectors at all times, while in the algorithm we say we should move toward the least square fitted vector. They are colored by red. One question naturally comes out, are these two directions the same? The following two lemmas answer this question.\newline
+
+\begin{lemma}
+\label{corr}
+Suppose we have three $n$-dimensional vecotrs $\mathbf{y}, \mathbf{x}_{1}$ and $\mathbf{x}_{2}$ with each of them has mean $0$. $\hat{\mathbf{y}}$ is the projection of $\mathbf{y}$ on the space span$\{\mathbf{x}_{1}, \mathbf{x}_{2}\}$ which is also the lease square fitted vector. $\lambda\in [0, 1]$. We have the condition
+$$corr(\mathbf{y}, \mathbf{x}_{1})=corr(\mathbf{y}, \mathbf{x}_{2})$$
+Then
+$$corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{1})=corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{2})$$
+\end{lemma}
+
+\begin{proof}
+We use $\bar{\mathbf{y}}, \bar{\mathbf{x}}_{1}, \bar{\mathbf{x}}_{2}$ to represent the mean vector for $\mathbf{y}, \mathbf{x}_{1}, \mathbf{x}_{2}$, $P$ to represent the projection matrix corresponding to span$\{\mathbf{x}_{1}, \mathbf{x}_{2}\}$. And $\mathbf{y}\cdot\mathbf{x}_{1}$ denotes the inner product of two vectors.\\
+In order to prove $corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{1})=corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{2})$, we only need to show
+$$\frac{[(\mathbf{y}-\lambda\hat{\mathbf{y}})-(\bar{\mathbf{y}}-\lambda\bar{\hat{\mathbf{y}}})]\cdot(\mathbf{x}_{1}-\bar{\mathbf{x}}_{1})}{\sqrt{(\mathbf{x}_{1}-\bar{\mathbf{x}}_{1})\cdot(\mathbf{x}_{1}-\bar{\mathbf{x}}_{1})}}=\frac{[(\mathbf{y}-\lambda\hat{\mathbf{y}})-(\bar{\mathbf{y}}-\lambda\bar{\hat{\mathbf{y}}})]\cdot(\mathbf{x}_{2}-\bar{\mathbf{x}}_{2})}{\sqrt{(\mathbf{x}_{2}-\bar{\mathbf{x}}_{2})\cdot(\mathbf{x}_{2}-\bar{\mathbf{x}}_{2})}}$$
+Since we have $\bar{\mathbf{y}}=\bar{\mathbf{x}}_{1}=\bar{\mathbf{x}}_{2}=\mathbf{0}$, thus span$\{\mathbf{x}_{1}, \mathbf{x}_{2}\}\perp \text{span}\{\mathbf{1}\}$. But $\hat{\mathbf{y}}=P\mathbf{y}\in\text{span}\{\mathbf{x}_{1}, \mathbf{x}_{2}\}$, then $\bar{\hat{\mathbf{y}}}=\mathbf{0}$. The conclusion can be simplified as
+\begin{equation}
+\frac{(\mathbf{y}-\lambda\hat{\mathbf{y}})\cdot\mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}=\frac{(\mathbf{y}-\lambda\hat{\mathbf{y}})\cdot\mathbf{x}_{2}}{\sqrt{\mathbf{x}_{2}\cdot\mathbf{x}_{2}}}\label{conclu}
+\end{equation}
+While we already know that 
+\begin{equation}
+\frac{\mathbf{y}\cdot\mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}=\frac{\mathbf{y}\cdot\mathbf{x}_{2}}{\sqrt{\mathbf{x}_{2}\cdot\mathbf{x}_{2}}}\label{cor1}
+\end{equation}
+Then
+\begin{equation}
+\frac{\mathbf{y}\cdot P'\mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}=\frac{\mathbf{y}\cdot P'\mathbf{x}_{2}}{\sqrt{\mathbf{x}_{2}\cdot\mathbf{x}_{2}}}\Rightarrow\frac{P\mathbf{y}\cdot \mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}=\frac{P\mathbf{y}\cdot \mathbf{x}_{2}}{\sqrt{\mathbf{x}_{2}\cdot\mathbf{x}_{2}}}\Rightarrow\frac{\hat{\mathbf{y}}\cdot \mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}=\frac{\hat{\mathbf{y}}\cdot\mathbf{x}_{2}}{\sqrt{\mathbf{x}_{2}\cdot\mathbf{x}_{2}}}\label{cor2}
+\end{equation}
+Now combine equation \ref{cor1} and \ref{cor2} together we can get equaiton \ref{conclu}.
+\end{proof}
+Lemma \ref{corr} has an intuitive meaning. Since we assume the mean of each vector is $0$, in this case correlation coefficient of two vectors becomes the consine of angle of the two vectors. If $\mathbf{y}$ has the same angle with $\mathbf{x}_{1}$ and $\mathbf{x}_{2}$, so does $\hat{\mathbf{y}}=P\mathbf{y}$ and any vector belongs to the plane determined by $\mathbf{y}$ and $\hat{\mathbf{y}}$.
+
+Lemma \ref{corr} can be easily extended to multiple vectors. Here, we only state the lemma without proof.
+\begin{lemma}
+Suppose we have $k+1$ $n$-dimensional vecotrs $\mathbf{y}, \mathbf{x}_{1},\cdots,\mathbf{x}_{k}$ with each of them has mean $0$. $\hat{\mathbf{y}}$ is the projection of $\mathbf{y}$ on the space span$\{\mathbf{x}_{1},\cdots, \mathbf{x}_{k}\}$ which is also the lease square fitted vector. $\lambda\in [0, 1]$. We have the condition
+$$corr(\mathbf{y}, \mathbf{x}_{1})=\cdots=corr(\mathbf{y}, \mathbf{x}_{k})$$
+Then
+$$corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{1})=\cdots=corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{k})$$
+\end{lemma}
+
+Since we now find a direction $\hat{\mathbf{y}}$ in the space span$\{\mathbf{x}_{1},\cdots, \mathbf{x}_{k}\}$ which has the same correlation coefficient with $\mathbf{x}_{1},\cdots, \mathbf{x}_{k}$. We start from vector $\mathbf{0}$ and move along the direction $\hat{\mathbf{y}}$ until we reach $\hat{\mathbf{y}}$. The $\vert corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{1})\vert=\cdots=\vert corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{k})\vert$ will monotonically decrease. In other words, $\vert corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{1})\vert=\cdots=\vert corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{k})\vert$ is a monotone function as to $\lambda\in[0, 1]$. We accept this fact without proof. 
+
+Suppose we have another vector $\mathbf{x}_{k+1}$ with mean $0$ and $\vert corr(\mathbf{y}, \mathbf{x}_{k+1})\vert<\vert corr(\mathbf{y}, \mathbf{x}_{1})\vert=\cdots=\vert corr(\mathbf{y}, \mathbf{x}_{k})\vert$. Our question is how to choose $\lambda$ such that $\vert corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{k+1})\vert=\vert corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{1})\vert=\cdots=\vert corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{k})\vert$? To answer this, we only need to solve the following equation
+$$\left\vert\frac{(\mathbf{y}-\lambda\hat{\mathbf{y}})\cdot\mathbf{x}_{k+1}}{\sqrt{\mathbf{x}_{k+1}\cdot\mathbf{x}_{k+1}}}\right\vert=\left\vert\frac{(\mathbf{y}-\lambda\hat{\mathbf{y}})\cdot\mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}\right\vert$$
+We can get 
+$$\lambda=min^{+}\left\{\frac{\mathbf{y}\cdot\left(\frac{\mathbf{x}_{k+1}}{\sqrt{\mathbf{x}_{k+1}\cdot\mathbf{x}_{k+1}}}-\frac{\mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}\right)}{\hat{\mathbf{y}}\cdot\left(\frac{\mathbf{x}_{k+1}}{\sqrt{\mathbf{x}_{k+1}\cdot\mathbf{x}_{k+1}}}-\frac{\mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}\right)}, \frac{\mathbf{y}\cdot\left(\frac{\mathbf{x}_{k+1}}{\sqrt{\mathbf{x}_{k+1}\cdot\mathbf{x}_{k+1}}}+\frac{\mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}\right)}{\hat{\mathbf{y}}\cdot\left(\frac{\mathbf{x}_{k+1}}{\sqrt{\mathbf{x}_{k+1}\cdot\mathbf{x}_{k+1}}}+\frac{\mathbf{x}_{1}}{\sqrt{\mathbf{x}_{1}\cdot\mathbf{x}_{1}}}\right)}\right\}$$
+where $min^{+}$ means we get the minimal positive value from the set.
+
+Here, we need to mention that the requirement that all the vectors have mean $0$ ($\bar{\mathbf{y}}=\bar{\mathbf{x}}_{1}=\cdots=\bar{\mathbf{x}}_{k}=\mathbf{0}$) or to say $\mathbf{y}\perp\mathbf{1}, \mathbf{x}_{1}\perp\mathbf{1},\cdots, \mathbf{x}_{k}\perp\mathbf{1}$ plays an important role. We should note that in least angle regression algorithm, the key is to find a vector $\mathbf{x}$ in the space span$\{\mathbf{x}_{1},\cdots, \mathbf{x}_{k}\}$ such that $corr(\mathbf{y}-\mathbf{x}, \mathbf{x}_{1})=\cdots=corr(\mathbf{y}-\mathbf{x}, \mathbf{x}_{k})$ which is equavalent to finding a vector $\mathbf{x}$ in the sapce span$\{\mathbf{x}_{1},\cdots, \mathbf{x}_{k}\}$ such that $corr(\mathbf{x},\mathbf{x}_{1})=\cdots=corr(\mathbf{x},\mathbf{x}_{k})$. In general, $\mathbf{x}$ is not necessary equal to $\hat{\mathbf{y}}$. But if we have the requirement above, then $\mathbf{x}=\hat{\mathbf{y}}$. This makes us consider two variants of LARS which can be found in section \@ref(variant). 
+
+Since if the mean of each vector is $0$, then the correlation coefficient which measures the association between two vectors is the consine value of the angle of the two vectors. We want to find the most associated preditor vector with response vector which means absolute value of consine value of their angle is the smallest. The is the source of the name "least angle".
+
+Another thing needs to be noticed in algorithm \ref{algo} is that predictor vectors are centralized. Strictly speaking, after we did some transformations, the linear model should change. But in the situation here, what is the relationship between the original linear model and the new linear model?
+Now considering the following two linear models
+\begin{equation}
+\label{lr1}
+\mathbf{y}=\mu\mathbf{1}+\beta_{1}\mathbf{x}_{1}+\cdots+\beta_{p}\mathbf{x}_{p}+\boldsymbol{\varepsilon}
+\end{equation}
+\begin{equation}
+\label{lr2}
+\mathbf{y}=\mu'\mathbf{1}+\beta^{'}_{1}(\mathbf{x}_{1}-\bar{\mathbf{x}}_{1})+\cdots+\beta^{'}_{p}(\mathbf{x}_{p}-\bar{\mathbf{x}}_{p})+\boldsymbol{\varepsilon}
+\end{equation}
+Obviously, span$\{\mathbf{1}, \mathbf{x}_{1},\cdots,\mathbf{x}_{p}\}=$ span$\{\mathbf{1}, \mathbf{x}_{1}-\bar{\mathbf{x}}_{1}, \cdots,\mathbf{x}_{p}-\bar{\mathbf{x}}_{p} \}$. The projection of $\mathbf{y}$ on these two spaces must be the same. Therefore
+$$\hat{\mu}\mathbf{1}+\hat{\beta}_{1}\mathbf{x}_{1}+\cdots+\hat{\beta}_{p}\mathbf{x}_{p}=\hat{\mu}'\mathbf{1}+\hat{\beta}^{'}_{1}(\mathbf{x}_{1}-\bar{\mathbf{x}}_{1})+\cdots+\hat{\beta}^{'}_{p}(\mathbf{x}_{p}-\bar{\mathbf{x}}_{p})$$
+The relationship between two sets of least square estimates are
+$$
+\begin{cases}
+\hat{\beta}_{1}=\hat{\beta}^{'}_{1}\\
+\vdots\\
+\hat{\beta}_{p}=\hat{\beta}^{'}_{p}\\
+\hat{\mu}=\hat{\mu}'-\hat{\beta}^{'}_{1}\bar{x}_{1}-\cdots-\hat{\beta}^{'}_{p}\bar{x}_{p}
+\end{cases}
+$$
+Also notice that, in model (\ref{lr2}), span$\{\mathbf{1}\}\perp\text{span}\{\mathbf{x}_{1}-\bar{\mathbf{x}}_{1}, \cdots, \mathbf{x}_{p}-\bar{\mathbf{x}}_{p}\}$. Every vector in the orthogonal space of span$\{1\}$ has mean $0$, if we take the residual of $\mathbf{y}$ after it projects on span$\{\mathbf{1}\}$, then everything is all set and we can apply least angle regression focusing on the space span$\{\mathbf{y}-\bar{\mathbf{y}}, \mathbf{x}_{1}-\bar{\mathbf{x}}_{1},\cdots, \mathbf{x}_{p}-\bar{\mathbf{x}}_{p}\}$. The paths of $\hat{\beta}^{'}_{1}, \cdots, \hat{\beta}^{'}_{p}$ can represent the paths of $\hat{\beta}_{1}, \cdots, \hat{\beta}_{p}$.
+
+
+
+
+
+
+
+
+# Two Variants of LARS {#variant}
+As we discussed in section \@ref(LARS), they may exist two variants of LARS.
+
+One variant is we insist on finding $\mathbf{x}$ has the equal correlation coefficient with $\mathbf{x}_{1}, \cdots, \mathbf{x}_{k}$, but in this case the final SSE may not be the least since $\mathbf{x}\neq\hat{\mathbf{y}}$. The other variant is we use the projection of $y$ on span$\{\mathbf{x}_{1},\cdots, \mathbf{x}_{k}\}$ and use $corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \hat{\mathbf{y}})$ to represent the association between $\mathbf{y}-\lambda\hat{\mathbf{y}}$ and span$\{\mathbf{x}_{1},\cdots, \mathbf{x}_{k}\}$ and find $\lambda$ such that $corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \hat{\mathbf{y}})=corr(\mathbf{y}-\lambda\hat{\mathbf{y}}, \mathbf{x}_{k+1})$. The advantage of this variant is SSE is the least square SSE. 
+
+
+# Simulation {#simu}
+
+We first use the following code to generate the data.
+
+```{r}
+data.simu <- function(n = 100, p = 4, coefs, sd.x = 1, snr = 5){
+  
+  X <- matrix(rnorm(n * p, 0, sd.x) ,nrow = n, ncol = p)
+  coefs <- runif(p + 1, 1, 4) * sample(c(-1, 1), size = p + 1, replace = TRUE)
+  
+  y <- cbind(rep(1, n), X) %*% coefs
+  y.mean <- y
+  
+  sd.e <- sd(y.mean) / snr
+  e <- rnorm(n, 0, sd.e)
+  y <- y.mean + e
+  
+  list(y=y, X=X, y.mean=y.mean, coefs=coefs)
+}
+```
+We use the following code to implement the least angle algorithm.
+
+```{r}
+lambda.cal <- function(y, y.hat, x1, xk){
+  
+  candidate1 <- sum(y * (xk / sqrt(sum(xk^2)) - x1 / sqrt(sum(x1^2)))) /
+    sum(y.hat * (xk / sqrt(sum(xk^2)) - x1 / sqrt(sum(x1^2))))
+  candidate2 <- sum(y * (xk / sqrt(sum(xk^2)) + x1 / sqrt(sum(x1^2)))) / 
+    sum(y.hat * (xk / sqrt(sum(xk^2)) + x1 / sqrt(sum(x1^2))))
+  
+  lambda <- c(candidate1, candidate2)
+  lambda <- lambda[lambda >= 0]
+  lambda <- min(lambda)
+  
+  lambda
+}
+
+mylars <- function(y, X){
+  
+  X <- scale(X, scale = F)
+  y <- y - mean(y)
+  n <- nrow(X)
+  p <- ncol(X)
+  
+  #use step.path to store which variabe enters in each step
+  step.path <- c()
+  lambda.path <- c()
+  index <- 1:p
+  
+  select <- which.max(abs(cor(y, X)))
+  step.path <- c(step.path, index[select])
+  index <- index[-select]
+  
+  for (i in 1:(min(n - 1, p) - 1)) {
+    
+    X.new <- X[,step.path]
+    y.hat <- lm(y ~ X.new - 1)$fitted.values
+    
+    lambda <- c()
+    for (j in 1:(p - length(step.path))) {
+      
+       if(length(step.path) == 1){
+         x1 <- X[,step.path]
+       } 
+      else{x1 <- X[,step.path][,1]}
+      
+      if(p - length(step.path) == 1){
+        xk <- X[,-step.path]
+      }
+      else{xk <- X[,-step.path][,j]}
+      
+       lambda[j] <- lambda.cal(y, y.hat, x1, xk)
+  }
+    
+    select <- which.min(lambda)[1]
+    lambda.path <- c(lambda.path, min(lambda))
+    step.path <- c(step.path, index[select])
+    index <- index[-select]
+    y <- y - min(lambda) * y.hat
+    
+  }
+  
+  list(step.path=step.path, lambda.path=lambda.path)
+}
+```
+There is a package called **lars** can implement the algorithm. Now let's compare if the function we coded gives the same results with the ones obtained from function lars().
+```{r}
+set.seed(1)
+data <- data.simu()
+mylars(data$y, data$X)
+
+library(lars)
+lars(data$X, data$y, type = "lar")
+```
+We can see the entering sequence of variables are the same.
 
 # References {-}
-1.  Efron, B., Hastie, T., Johnstone, I., Tibshirani, R. (2004). Least Angle Regression. Annals of Statistics, 32(2).
-2. Hastie, T., Tibshirani, R., Friedman, J. (2008). The Elements of Statistical Learning. New York, NY, USA: Springer New York Inc.
-3. Shiny from R Studio. http://shiny.rstudio.com/
-
-
-
